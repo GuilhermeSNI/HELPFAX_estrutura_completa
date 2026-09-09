@@ -4,4 +4,4 @@
 // window.HELPFAX_API_URL = "https://helpfax-api.onrender.com";
 //
 // Se o frontend e a API estiverem no mesmo domínio, deixe vazio.
-window.HELPFAX_API_URL = "";
+window.HELPFAX_API_URL = "https://guilhermesni.github.io/HELPFAX_estrutura_completa/";
