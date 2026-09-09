@@ -31,10 +31,18 @@ app.use(express.json());
 // Ex.: https://guilhermesni.github.io
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  const allowed = process.env.FRONTEND_URL;
+  const configured = process.env.FRONTEND_URL || "";
+  let allowedOrigin = configured;
 
-  if (!allowed || !origin || origin === allowed) {
-    res.setHeader("Access-Control-Allow-Origin", allowed || "*");
+  // Aceita tanto a origem pura do GitHub Pages quanto uma URL com o caminho do projeto.
+  // Ex.: FRONTEND_URL pode ser https://guilhermesni.github.io/HELPFAX_estrutura_completa
+  // mas o navegador envia Origin: https://guilhermesni.github.io
+  try {
+    if (configured) allowedOrigin = new URL(configured).origin;
+  } catch (_) {}
+
+  if (!origin || !allowedOrigin || origin === allowedOrigin) {
+    res.setHeader("Access-Control-Allow-Origin", origin || allowedOrigin || "*");
   }
 
   res.setHeader("Vary", "Origin");
