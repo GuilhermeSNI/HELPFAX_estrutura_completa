@@ -15,15 +15,14 @@ let demoToners = JSON.parse(localStorage.getItem("helpaxDemoToners") || "null") 
 let demoHistory = JSON.parse(localStorage.getItem("helpaxDemoHistory") || "[]");
 function saveDemo(){ localStorage.setItem("helpaxDemoToners", JSON.stringify(demoToners)); localStorage.setItem("helpaxDemoHistory", JSON.stringify(demoHistory)); }
 
-const API_BASE_URL = (window.HELPFAX_API_URL || "").replace(/\/$/, "");
+const API_BASE = String(window.HELPFAX_API_URL || "").replace(/\\/$/, "");
 
 function api(url, options = {}) {
   if (demoMode) return demoApi(url, options);
   options.headers = { ...(options.headers || {}), "Content-Type": "application/json" };
   if (token && url !== "/api/login") options.headers.Authorization = `Bearer ${token}`;
 
-  const requestUrl = `${API_BASE_URL}${url}`;
-
+  const requestUrl = API_BASE ? `${API_BASE}${url}` : url;
   return fetch(requestUrl, options).then(async r => {
     const contentType = r.headers.get("content-type") || "";
     const data = contentType.includes("application/json")

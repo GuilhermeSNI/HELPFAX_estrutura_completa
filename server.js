@@ -1,7 +1,6 @@
 require("dotenv").config();
 
 const express = require("express");
-const cors = require("cors");
 const path = require("path");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -11,40 +10,42 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "troque-esta-chave";
 
+const DATABASE_URL = process.env.DATABASE_URL;
+
+if (!DATABASE_URL && process.env.NODE_ENV === "production") {
+  console.error("DATABASE_URL não configurada. No Render, adicione a variável DATABASE_URL com a Internal Database URL do PostgreSQL.");
+  process.exit(1);
+}
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.PGSSL === "true" ? { rejectUnauthorized: false } : undefined
+  connectionString: DATABASE_URL,
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000
 });
 
 app.use(express.json());
 
-// Permite que o frontend hospedado no GitHub Pages converse com esta API.
-const allowedOrigins = (process.env.FRONTEND_URL || "")
-  .split(",")
-  .map(value => value.trim())
-  .filter(Boolean);
+// CORS para permitir que o GitHub Pages converse com a API no Render.
+// FRONTEND_URL deve conter a origem do seu GitHub Pages, sem barra final.
+// Ex.: https://guilhermesni.github.io
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  const allowed = process.env.FRONTEND_URL;
 
-app.use(cors({
-  origin(origin, callback) {
-    // Requisições sem Origin (health checks, curl etc.) são permitidas.
-    if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    return callback(new Error("Origem não autorizada pelo servidor."));
+  if (!allowed || !origin || origin === allowed) {
+    res.setHeader("Access-Control-Allow-Origin", allowed || "*");
   }
-}));
 
-// O backend não depende da pasta public. O frontend pode ser hospedado
-// separadamente no GitHub Pages.
-app.get("/api/health", async (_req, res) => {
-  try {
-    await pool.query("SELECT 1");
-    res.json({ ok: true, banco: "conectado" });
-  } catch (e) {
-    console.error("Health check do banco:", e);
-    res.status(503).json({ ok: false, banco: "indisponível" });
-  }
+  res.setHeader("Vary", "Origin");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS");
+
+  if (req.method === "OPTIONS") return res.sendStatus(204);
+  next();
 });
+
+app.use(express.static(__dirname));
 
 function auth(req, res, next) {
   const header = req.headers.authorization || "";
@@ -59,6 +60,16 @@ function auth(req, res, next) {
     return res.status(401).json({ erro: "Sessão expirada ou inválida." });
   }
 }
+
+app.get("/api/health", async (_req, res) => {
+  try {
+    await pool.query("SELECT 1");
+    res.json({ ok: true, banco: "conectado" });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ ok: false, banco: "erro" });
+  }
+});
 
 app.post("/api/login", async (req, res) => {
   try {
@@ -224,6 +235,8 @@ app.get("/api/movimentacoes", auth, async (_req, res) => {
 });
 
 async function init() {
+  console.log(`Ambiente: ${process.env.NODE_ENV || "development"}`);
+  console.log(`DATABASE_URL configurada: ${Boolean(DATABASE_URL)}`);
   // Garante que as tabelas existam antes de criar o usuário padrão.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS usuarios (
