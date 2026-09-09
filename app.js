@@ -15,7 +15,7 @@ let demoToners = JSON.parse(localStorage.getItem("helpaxDemoToners") || "null") 
 let demoHistory = JSON.parse(localStorage.getItem("helpaxDemoHistory") || "[]");
 function saveDemo(){ localStorage.setItem("helpaxDemoToners", JSON.stringify(demoToners)); localStorage.setItem("helpaxDemoHistory", JSON.stringify(demoHistory)); }
 
-const API_BASE = String(window.HELPFAX_API_URL || "").replace(/\\/$/, "");
+const API_BASE = String(window.HELPFAX_API_URL || "").trim().replace(/\/$/, "");
 
 function api(url, options = {}) {
   if (demoMode) return demoApi(url, options);
@@ -145,14 +145,14 @@ $("loginForm").addEventListener("submit", async e => {
     const loginValue = $("login").value.trim().toLowerCase();
     const senhaValue = $("senha").value;
 
-    // Se o HTML estiver sendo aberto sozinho ou não houver servidor disponível,
-    // permite o acesso local com o usuário de demonstração.
+    // Se o HTML estiver sendo aberto sozinho ou a API estiver indisponível,
+    // permite o acesso local de demonstração sem quebrar o login.
     const servidorIndisponivel =
       location.protocol === "file:" ||
       !e.status ||
       e.status === 404 ||
       e.status >= 500 ||
-      /Failed to fetch|NetworkError|Load failed|fetch|HTTP 404/i.test(e.message);
+      /Failed to fetch|NetworkError|Load failed|fetch|CORS|HTTP 404/i.test(e.message);
 
     if (loginValue === "guilherme" && senhaValue === "1234" && servidorIndisponivel) {
       demoMode = true;

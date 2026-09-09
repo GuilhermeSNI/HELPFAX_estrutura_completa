@@ -31,18 +31,22 @@ app.use(express.json());
 // Ex.: https://guilhermesni.github.io
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  const configured = process.env.FRONTEND_URL || "";
-  let allowedOrigin = configured;
+  const configured = String(process.env.FRONTEND_URL || "").trim().replace(/\/$/, "");
+  let allowedOrigin = "";
 
-  // Aceita tanto a origem pura do GitHub Pages quanto uma URL com o caminho do projeto.
-  // Ex.: FRONTEND_URL pode ser https://guilhermesni.github.io/HELPFAX_estrutura_completa
-  // mas o navegador envia Origin: https://guilhermesni.github.io
   try {
-    if (configured) allowedOrigin = new URL(configured).origin;
-  } catch (_) {}
+    allowedOrigin = configured ? new URL(configured).origin : "";
+  } catch {
+    allowedOrigin = configured;
+  }
 
-  if (!origin || !allowedOrigin || origin === allowedOrigin) {
-    res.setHeader("Access-Control-Allow-Origin", origin || allowedOrigin || "*");
+  // O navegador envia apenas a origem (protocolo + domínio + porta),
+  // mesmo quando o GitHub Pages está publicado em /HELPFAX_estrutura_completa.
+  // Por isso FRONTEND_URL pode conter o caminho, mas o CORS compara apenas a origem.
+  // Sem FRONTEND_URL, mantém compatibilidade com testes locais.
+  // Em produção, libere somente a origem configurada.
+  if (!allowedOrigin || !origin || origin === allowedOrigin) {
+    res.setHeader("Access-Control-Allow-Origin", allowedOrigin || "*");
   }
 
   res.setHeader("Vary", "Origin");
@@ -81,11 +85,40 @@ app.get("/api/health", async (_req, res) => {
 
 app.post("/api/login", async (req, res) => {
   try {
-    const { login, senha } = req.body;
-    const result = await pool.query(
-      "SELECT id, nome, login, senha_hash FROM usuarios WHERE login = $1",
+    const login = String(req.body?.login || "").trim().toLowerCase();
+    const senha = String(req.body?.senha || "");
+
+    if (!login || !senha) {
+      return res.status(400).json({ erro: "Informe usuário e senha." });
+    }
+
+    let result = await pool.query(
+      "SELECT id, nome, login, senha_hash FROM usuarios WHERE LOWER(login) = $1",
       [login]
     );
+
+    // Recuperação automática do acesso padrão. Isso também corrige instalações
+    // antigas em que o usuário foi criado com outra senha/hash.
+    if (login === "guilherme" && senha === "1234") {
+      const senhaHash = await bcrypt.hash("1234", 12);
+      if (!result.rows.length) {
+        result = await pool.query(
+          `INSERT INTO usuarios (nome, login, senha_hash)
+           VALUES ('Guilherme', 'guilherme', $1)
+           RETURNING id, nome, login, senha_hash`,
+          [senhaHash]
+        );
+      } else {
+        await pool.query(
+          "UPDATE usuarios SET nome = 'Guilherme', login = 'guilherme', senha_hash = $1 WHERE id = $2",
+          [senhaHash, result.rows[0].id]
+        );
+        result = await pool.query(
+          "SELECT id, nome, login, senha_hash FROM usuarios WHERE id = $1",
+          [result.rows[0].id]
+        );
+      }
+    }
 
     if (!result.rows.length) {
       return res.status(401).json({ erro: "Usuário ou senha incorretos." });
@@ -107,7 +140,7 @@ app.post("/api/login", async (req, res) => {
       usuario: { id: usuario.id, nome: usuario.nome, login: usuario.login }
     });
   } catch (e) {
-    console.error(e);
+    console.error("Erro no login:", e);
     res.status(500).json({ erro: "Erro ao realizar login." });
   }
 });

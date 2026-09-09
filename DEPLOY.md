@@ -14,7 +14,8 @@ O backend é o `server.js` deste mesmo projeto. Publique-o em Render, Railway ou
 Variáveis de ambiente:
 - `DATABASE_URL` = URL do PostgreSQL
 - `JWT_SECRET` = uma chave secreta forte
-- `FRONTEND_URL` = `https://guilhermesni.github.io` (ou a origem exata do seu Pages)
+- `FRONTEND_URL` = a origem do seu GitHub Pages, por exemplo `https://guilhermesni.github.io`
+  (sem precisar colocar `/HELPFAX_estrutura_completa` no final).
 - `NODE_ENV` = `production`
 
 ## 3. Teste
@@ -28,3 +29,11 @@ Deve retornar:
 
 ## Importante
 GitHub Pages não executa Node.js nem acessa PostgreSQL diretamente. Ele hospeda apenas o frontend. O `server.js` precisa estar rodando em um servidor Node.
+
+
+## Login funcionando
+Após o deploy do backend e a configuração do PostgreSQL:
+- Usuário: `guilherme`
+- Senha: `1234`
+
+O servidor cria/atualiza automaticamente esse usuário na inicialização. Se o frontend estiver no GitHub Pages, confirme que `FRONTEND_URL` no Render corresponde exatamente ao domínio do Pages e que `api-config.js` aponta para a URL do backend.
